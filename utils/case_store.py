@@ -23,6 +23,8 @@ def load_cases() -> list[dict[str, Any]]:
     for record in data:
         if isinstance(record, dict) and isinstance(record.get("result"), dict):
             record["result"] = normalize_case(record["result"], record.get("payload", {}))
+            if record["result"].get("case_title"):
+                record["title"] = record["result"]["case_title"]
     return data
 
 

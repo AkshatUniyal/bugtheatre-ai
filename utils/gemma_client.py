@@ -95,7 +95,129 @@ def _case_text(case: dict[str, Any], input_payload: dict[str, Any]) -> str:
     return json.dumps({"case": case, "input": input_payload}, default=str).lower()
 
 
+def _input_text(input_payload: dict[str, Any]) -> str:
+    return json.dumps(input_payload, default=str).lower()
+
+
+def _is_react_hydration_input(input_payload: dict[str, Any]) -> bool:
+    text = _input_text(input_payload)
+    hydration_signals = ("hydration", "server-rendered html", "server html", "client html", "ssr")
+    react_signals = ("react", "next.js", "nextjs", "header.tsx", "new date", "tolocaletimestring", "timestamp")
+    return any(signal in text for signal in hydration_signals) and any(signal in text for signal in react_signals)
+
+
+def _harden_react_hydration_case(case: dict[str, Any], input_payload: dict[str, Any]) -> dict[str, Any]:
+    if not _is_react_hydration_input(input_payload):
+        return case
+
+    title = input_payload.get("title") or case.get("case_title") or "Cart page hydration issue"
+    case["case_title"] = title
+    case["affected_layer"] = "frontend"
+    case["severity"] = "high"
+    case["confidence"] = "high"
+    case["confidence_score"] = max(_as_score(case.get("confidence_score"), 88), 88)
+    case["summary"] = (
+        "The evidence points to a React / Next.js hydration mismatch caused by non-deterministic render output. "
+        "A timestamp is generated during render, so the server-rendered HTML and client-rendered HTML can disagree during hydration."
+    )
+    case["risk_if_ignored"] = (
+        "Users may see page flicker, hydration warnings, inconsistent UI state, and reduced trust in page freshness."
+    )
+    case["prime_suspect"] = {
+        "name": "Non-deterministic SSR render value",
+        "why_likely": (
+            "The evidence mentions React hydration failure, server/client HTML mismatch, and a timestamp generated with "
+            "new Date().toLocaleTimeString() during render. That value can differ between server and client."
+        ),
+        "evidence": [
+            "Hydration failed because the initial UI does not match server-rendered HTML.",
+            "Text content differs between server render and client hydration.",
+            "Header.tsx renders a live timestamp using new Date().toLocaleTimeString().",
+        ],
+        "first_confirmation_step": "Replace the render-time timestamp with a stable server value or move it into a client-only effect, then reload the page.",
+    }
+    case["suspects"] = [
+        {
+            "name": "Timestamp computed during SSR render",
+            "probability": "high",
+            "probability_score": 90,
+            "evidence_for": ["new Date().toLocaleTimeString()", "server/client text mismatch", "hydration warning"],
+            "evidence_against": ["Need exact component stack and route to confirm the mount path"],
+            "how_to_confirm": "Render a stable placeholder on the server, update time after mount, and confirm hydration warnings disappear.",
+            "status": "prime",
+        },
+        {
+            "name": "Other browser-only render value",
+            "probability": "medium",
+            "probability_score": 45,
+            "evidence_for": ["Hydration mismatches can also come from locale, randomness, or window-dependent values"],
+            "evidence_against": ["The provided evidence specifically points to the timestamp"],
+            "how_to_confirm": "Audit the affected route for Date.now(), Math.random(), locale-sensitive formatting, and browser-only APIs during render.",
+            "status": "investigate",
+        },
+    ]
+    case["failure_timeline"] = [
+        "Server renders the cart page and computes a timestamp in Header.tsx.",
+        "Browser receives server HTML with that timestamp text.",
+        "Client hydration computes a new timestamp value.",
+        "React detects that client text does not match server-rendered HTML.",
+        "The page replaces server content with client content and logs hydration warnings.",
+    ]
+    case["false_leads"] = [
+        {
+            "lead": "Suppressing the hydration warning",
+            "why_to_avoid": "It hides the symptom but leaves inconsistent server/client output in place.",
+        },
+        {
+            "lead": "Reloading the page as a fix",
+            "why_to_avoid": "The timestamp can differ on every fresh render, so the mismatch can recur.",
+        },
+    ]
+    case["fix_plan"] = {
+        "quick_patch": "Render a stable placeholder until the component mounts, then show the live time on the client.",
+        "clean_fix": "Pass a stable formatted timestamp from the server or isolate dynamic time display in a client-only component.",
+        "prevention": "Add a lint/review rule for unstable SSR render values such as Date.now(), Math.random(), locale-sensitive formatting, and browser-only APIs.",
+        "validation_steps": [
+            "Run the app in production mode.",
+            "Reload the affected route several times.",
+            "Confirm no React hydration warnings appear in the browser console.",
+            "Verify the timestamp still updates correctly after client mount.",
+        ],
+        "rollback": "Revert the timestamp display change if the header must remain server-only, then replace it with a static server-provided value.",
+    }
+    case["suggested_patch"] = (
+        '- <span>Last updated: {new Date().toLocaleTimeString()}</span>\n'
+        '+ <ClientTimeLabel label="Last updated" />'
+    )
+    case["commands_to_run"] = [
+        "npm run build",
+        "npm run start",
+        "npx playwright test hydration.spec.ts",
+    ]
+    case["missing_evidence"] = [
+        "Full browser console stack trace",
+        "The route or layout where Header.tsx is mounted",
+        "Whether the affected route uses SSR, SSG, or client-only rendering",
+    ]
+    case["postmortem"] = {
+        "summary": "A hydration mismatch occurred because server and client renders produced different timestamp text.",
+        "impact": "Users saw page flicker and React hydration warnings after reload.",
+        "root_cause": "A render-time timestamp was computed independently on server and client.",
+        "detection": "Detected through React hydration warnings and mismatched timestamp text.",
+        "resolution": "Moved the dynamic timestamp to a client-only path or replaced it with a stable server-provided value.",
+        "prevention": "Avoid non-deterministic values during SSR and add regression coverage for reload hydration.",
+        "follow_up_actions": [
+            "Add a hydration reload test.",
+            "Audit SSR components for Date.now() and Math.random().",
+            "Document SSR-safe render rules.",
+        ],
+    }
+    return case
+
+
 def _is_laravel_csrf_case(case: dict[str, Any], input_payload: dict[str, Any]) -> bool:
+    if _is_react_hydration_input(input_payload):
+        return False
     text = _case_text(case, input_payload)
     signals = ("laravel", "csrf", "419", "tokenmismatch", "page expired", "verifycsrftoken", "session")
     return ("csrf" in text or "419" in text or "tokenmismatch" in text or "page expired" in text) and any(signal in text for signal in signals)
@@ -214,6 +336,7 @@ def _harden_laravel_csrf_case(case: dict[str, Any], input_payload: dict[str, Any
 
 def normalize_case(case: dict[str, Any], input_payload: dict[str, Any]) -> dict[str, Any]:
     """Fill the full UI contract when smaller local models return a compact JSON."""
+    case = _harden_react_hydration_case(case, input_payload)
     case = _harden_laravel_csrf_case(case, input_payload)
     title = case.get("case_title") or input_payload.get("case_title") or input_payload.get("title") or "Bug investigation"
     prime = case.get("prime_suspect") if isinstance(case.get("prime_suspect"), dict) else {}

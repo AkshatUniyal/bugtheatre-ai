@@ -491,6 +491,14 @@ def inject_css() -> None:
           gap: 0.85rem;
         }
 
+        .saved-case-picker {
+          margin-top: 0.95rem;
+          padding-top: 0.95rem;
+          border-top: 1px solid rgba(255,255,255,0.08);
+          display: grid;
+          gap: 0.7rem;
+        }
+
         .investigation-actions {
           margin-top: 1.15rem;
           padding-top: 0.2rem;
@@ -854,8 +862,19 @@ def technical_artifacts(case: dict[str, Any]) -> list[str]:
 def load_sample_case(name: str) -> None:
     st.session_state.loaded_sample = name
     st.session_state.case_result = get_demo_case(name)
+    st.session_state.current_case_id = f"Sample: {name}"
     st.session_state.form_defaults = sample_text(name)
     st.session_state.case_form_version = st.session_state.get("case_form_version", 0) + 1
+    st.session_state.page = "Investigation Board"
+
+
+def open_saved_case(record: dict[str, Any]) -> None:
+    st.session_state.case_result = record.get("result") or get_demo_case("React hydration mismatch")
+    st.session_state.current_case_id = record.get("id")
+    payload = record.get("payload")
+    if isinstance(payload, dict):
+        st.session_state.form_defaults = {**blank_case_form(), **payload}
+        st.session_state.case_form_version = st.session_state.get("case_form_version", 0) + 1
     st.session_state.page = "Investigation Board"
 
 
@@ -1234,6 +1253,22 @@ def render_dashboard() -> None:
             """,
             unsafe_allow_html=True,
         )
+        if saved_cases:
+            st.markdown('<div class="saved-case-picker">', unsafe_allow_html=True)
+            saved_case_labels = [
+                f"{item.get('title', 'Untitled case')} · {item.get('created_at', '')}" for item in recent
+            ]
+            selected_label = st.selectbox(
+                "Open saved case",
+                saved_case_labels,
+                label_visibility="collapsed",
+                key="dashboard_saved_case_picker",
+            )
+            selected_index = saved_case_labels.index(selected_label)
+            if st.button("Open selected saved case", use_container_width=True):
+                open_saved_case(recent[selected_index])
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
     with right:
         html_card(
@@ -1363,13 +1398,14 @@ def render_metric_cards(case: dict[str, Any]) -> None:
 
 def render_investigation(case: dict[str, Any] | None = None) -> None:
     case = case or st.session_state.get("case_result") or get_demo_case("React hydration mismatch")
+    case_id = st.session_state.get("current_case_id", "Demo case")
     st.markdown("<h1>Investigation Board</h1>", unsafe_allow_html=True)
     st.markdown('<div class="bt-subtitle">Most probable root cause, evidence, missing inputs, and risk in one place.</div>', unsafe_allow_html=True)
 
     st.markdown(
         f"""
         <div class="meta-strip">
-          <div class="meta-item"><div class="meta-label">Case ID</div><div class="meta-value">BT-2026-05-11-1847</div></div>
+          <div class="meta-item"><div class="meta-label">Case ID</div><div class="meta-value">{e(case_id)}</div></div>
           <div class="meta-item"><div class="meta-label">Severity</div><div class="meta-value"><span class="pill {severity_class(case.get('severity', ''))}">{e(case.get('severity', '').title())}</span></div></div>
           <div class="meta-item"><div class="meta-label">Confidence</div><div class="meta-value"><span class="pill green">{e(case.get('confidence_score'))}%</span></div></div>
           <div class="meta-item"><div class="meta-label">Affected Layer</div><div class="meta-value">{e(case.get('affected_layer', '').title())}</div></div>
