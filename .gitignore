@@ -1,0 +1,23 @@
+.DS_Store
+
+# Local environment
+.env
+.venv/
+__pycache__/
+*.py[cod]
+
+# Streamlit/runtime cache
+.streamlit/secrets.toml
+.pytest_cache/
+.ruff_cache/
+
+# Local app output
+data/cases.json
+exports/
+
+# Private planning and submission material
+Documents/
+
+# Large or generated media captures
+assets/screenshots/*
+!assets/screenshots/.gitkeep
