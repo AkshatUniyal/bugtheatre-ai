@@ -468,6 +468,17 @@ def inject_css() -> None:
           line-height: 1.48;
         }
 
+        .artifact-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.55rem 0.65rem;
+          padding-top: 0.15rem;
+        }
+
+        .artifact-chips .pill {
+          margin: 0;
+        }
+
         .export-actions {
           margin-top: 1rem;
           display: grid;
@@ -1566,7 +1577,7 @@ def render_postmortem() -> None:
             f"""
             <div class="bt-card gold-border postmortem-preview">
               <div class="postmortem-title">Postmortem: {e(case.get('case_title', 'Bug Case'))}</div>
-              <div class="pm-section"><div class="pm-heading">Technical Artifacts</div><div class="pm-body">{''.join(f"<span class='pill'>{e(item)}</span> " for item in artifacts)}</div></div>
+              <div class="pm-section"><div class="pm-heading">Technical Artifacts</div><div class="pm-body artifact-chips">{''.join(f"<span class='pill'>{e(item)}</span>" for item in artifacts)}</div></div>
               <div class="pm-section"><div class="pm-heading">Summary</div><div class="pm-body">{e(pm.get('summary'))}</div></div>
               <div class="pm-section"><div class="pm-heading">Impact</div><div class="pm-body">{e(pm.get('impact'))}</div></div>
               <div class="pm-section"><div class="pm-heading">Root Cause</div><div class="pm-body">{e(pm.get('root_cause'))}</div></div>
