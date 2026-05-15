@@ -1617,6 +1617,11 @@ def main() -> None:
     if "case_form_version" not in st.session_state:
         st.session_state.case_form_version = 0
 
+    page_param = st.query_params.get("page")
+    valid_pages = {"Dashboard", "Open Case", "Sample Cases", "Investigation Board", "Patch Room", "Postmortem"}
+    if page_param in valid_pages:
+        st.session_state.page = page_param
+
     page = render_sidebar()
     render_topbar()
     if page == "Dashboard":
