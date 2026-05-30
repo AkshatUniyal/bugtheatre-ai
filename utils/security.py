@@ -17,6 +17,9 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("password", re.compile(r"(?i)\b(password|passwd|pwd)\s*[:=]\s*['\"]?([^'\"\s]{6,})['\"]?")),
     ("database url", re.compile(r"(?i)\b[a-z]+://[^:\s]+:[^@\s]+@[^/\s]+/[^\s]+")),
     ("aws access key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    ("jwt token", re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b")),
+    ("github token", re.compile(r"\b(ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{80,})\b")),
+    ("slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9\-]{10,}\b")),
     ("generic long secret", re.compile(r"\b[a-zA-Z0-9_\-]{32,}\b")),
 ]
 

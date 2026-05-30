@@ -55,7 +55,7 @@ def ollama_available() -> bool:
 
 
 def build_prompt(input_payload: dict[str, Any]) -> str:
-    prompt_path = Path("prompts/investigation_prompt.md")
+    prompt_path = Path(__file__).resolve().parents[1] / "prompts" / "investigation_prompt.md"
     base_prompt = prompt_path.read_text(encoding="utf-8") if prompt_path.exists() else ""
     prompt_payload = {key: value for key, value in input_payload.items() if key != "screenshot_base64"}
     return f"""{base_prompt}
